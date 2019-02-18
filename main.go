@@ -43,13 +43,32 @@ func isPRMergeable(reviews []*github.PullRequestReview, pr *github.PullRequest) 
 }
 
 func main() {
+	if len(os.Args) != 2 {
+		fmt.Printf("Usage: %s [Pull Request URL]", os.Args[0])
+		os.Exit(0)
+	}
 
 	urlParts := strings.Split(os.Args[1], "/")
+	if len(urlParts) != 7 {
+		fmt.Println("You must supply a valid PR URL")
+		os.Exit(0)
+	}
+
 	owner := urlParts[3]
 	repo := urlParts[4]
-	prNumber, _ := strconv.Atoi(urlParts[6])
+
+	prNumber, err := strconv.Atoi(urlParts[6])
+	if err != nil {
+		fmt.Println("The PR URL must end with the PR number")
+		os.Exit(0)
+	}
 
 	token := os.Getenv("GH_ACCESS_TOKEN")
+	if token == "" {
+		fmt.Println("GH_ACCESS_TOKEN access token must be set")
+		os.Exit(0)
+	}
+
 	tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	tokenContext := oauth2.NewClient(ctx, tokenSource)
 	client = github.NewClient(tokenContext)
