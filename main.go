@@ -19,7 +19,7 @@ var client *github.Client
 func isPRMergeable(reviews []*github.PullRequestReview, pr *github.PullRequest) bool {
     prApproved := false
     for _, review := range reviews {
-        if review.GetState() == "APPROVED" {
+        if review.GetState() == "APPROVED" && review.GetCommitID() == pr.GetHead().GetSHA() {
             prApproved = true
             break
         }
