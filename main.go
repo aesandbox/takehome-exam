@@ -5,6 +5,7 @@ import (
     "fmt"
     "github.com/google/go-github/github"
     "golang.org/x/oauth2"
+    "log"
     "os"
     "strconv"
     "strings"
@@ -18,18 +19,18 @@ var client *github.Client
 func isPRMergeable(reviews []*github.PullRequestReview, pr *github.PullRequest) bool {
     prApproved := false
     for _, review := range reviews {
-        if review.GetState() == "APPROVED" {
+        if review.GetState() == "APPROVED" && review.GetCommitID() == pr.GetHead().GetSHA() {
             prApproved = true
             break
         }
     }
     if !prApproved {
-        fmt.Println("PR is not approved")
+        log.Println("PR is not approved")
         return false
     }
 
     if pr.GetMergeableState() != "clean" {
-        fmt.Println("PR is not in a mergeable state. Check status check or if already merged")
+        log.Println("PR is not in a mergeable state. Check status check or if already merged")
         return false
     }
 
@@ -44,14 +45,12 @@ func isPRMergeable(reviews []*github.PullRequestReview, pr *github.PullRequest) 
 
 func main() {
     if len(os.Args) != 2 {
-        fmt.Printf("Usage: %s [Pull Request URL]", os.Args[0])
-        os.Exit(0)
+        log.Fatalf("Usage: %s [Pull Request URL]", os.Args[0])
     }
 
     urlParts := strings.Split(os.Args[1], "/")
     if len(urlParts) != 7 {
-        fmt.Println("You must supply a valid PR URL")
-        os.Exit(0)
+        log.Fatal("You must supply a valid PR URL")
     }
 
     owner := urlParts[3]
@@ -59,14 +58,12 @@ func main() {
 
     prNumber, err := strconv.Atoi(urlParts[6])
     if err != nil {
-        fmt.Println("The PR URL must end with the PR number")
-        os.Exit(0)
+        log.Fatal("The PR URL must end with the PR number")
     }
 
     token := os.Getenv("GH_ACCESS_TOKEN")
     if token == "" {
-        fmt.Println("GH_ACCESS_TOKEN access token must be set")
-        os.Exit(0)
+        log.Fatal("GH_ACCESS_TOKEN access token must be set")
     }
 
     tokenSource := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
@@ -75,31 +72,26 @@ func main() {
 
     pr, _, err := client.PullRequests.Get(ctx, owner, repo, prNumber)
     if err != nil {
-        fmt.Println("Request to get PR info failed. Verify PR URL")
-        os.Exit(1)
+        log.Fatal("Request to get PR info failed. Verify PR URL")
     }
 
     reviews, _, err := client.PullRequests.ListReviews(ctx, owner, repo, prNumber, nil)
     if err != nil {
-        fmt.Println("Request to get reviews failed. Verify PR URL")
-        os.Exit(1)
+        log.Fatal("Request to get reviews failed. Verify PR URL")
     }
 
     if !isPRMergeable(reviews, pr) {
-        fmt.Println("Aborting merge")
-        os.Exit(1)
+        log.Fatal("Aborting merge")
     }
 
     _, _, err = client.PullRequests.Merge(ctx, owner, repo, prNumber, "Merging via script", nil)
     if err != nil {
-        fmt.Println("Merge request failed")
-        os.Exit(1)
+        log.Fatal("Merge request failed")
     }
 
     _, err = client.Git.DeleteRef(ctx, owner, repo, "heads/"+pr.GetHead().GetRef())
     if err != nil {
-        fmt.Println("Failed to delete PR branch")
-        os.Exit(1)
+        log.Fatal("Failed to delete PR branch")
     }
 
     fmt.Println("PR was merged and branch was deleted successfully!")
